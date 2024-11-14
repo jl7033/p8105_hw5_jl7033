@@ -122,4 +122,94 @@ From the plot, we can see that the sample averages for each value of $\mu$ are a
 
 ## Problem 3
 
+#### Upload the Data
+
+```{r}
+
+homicides = read_csv("data/homicide-data.csv")
+
+```
+
+#### Describing the Dataset
+
+```{r}
+
+summary(homicides$reported_date)
+
+```
+
+```{r}
+
+mean(as.numeric(homicides$victim_age), na.rm = TRUE)
+median(as.numeric(homicides$victim_age), na.rm = TRUE)
+
+```
+
+```{r}
+
+homicides |>
+  group_by(victim_race) |>
+  count() |>
+  summarize(prop = n/nrow(homicides)) 
+
+```
+
+The raw data encompasses a total of 50 large cities throughout the United States. The data spans an eight-year period from January 2007 to November 2015 (I found this by running `summary(homicides$reported_date`). Not accounting for homicides for which the age of the victim was unknown, the mean victim age was 31.8 and the median age was 28. Nearly 64\% of the victims were Black; the next highest represented racial group was Hispanic, which accounted for 13.2\% of the homicides in the dataset.
+
+#### Combine city and state into a "city_state" column
+
+```{r}
+
+homicides = homicides |> 
+  unite(col = "city_state", city, state, sep = ", ")
+
+```
+
+#### Summarize to find Number of Total / Unsolved Homicides by City
+
+```{r}
+
+homicides = homicides |>
+  mutate(unsolved = 
+      disposition == "Closed without arrest" |
+      disposition == "Open/No arrest")
+
+homicides |> 
+  group_by(city_state) |>
+  summarize(
+    num_homicides = length(disposition),
+    num_unsolved = sum(unsolved)
+  )
+
+```
+
+#### Using prop.test for Baltimore
+
+```{r}
+
+homicides |>
+  filter(city_state == "Baltimore, MD") |>
+  pull(unsolved) |>
+  prop.test(sum(unsolved), n = length(unsolved), p = 0.5)
+  
+
+```
+
+```{r}
+
+x = c(TRUE, TRUE, FALSE, TRUE, FALSE, FALSE, TRUE)
+
+prop.test(sum(x), n = 7, p = 0.5)
+
+```
+
+```{r}
+
+heads <- rbinom(1, size = 100, prob = .5)
+prop.test(heads, 100)          # continuity correction TRUE by default
+prop.test(heads, 100, correct = FALSE)
+
+heads
+
+```
 
