@@ -1,0 +1,93 @@
+---
+title: "P8105 - Homework 5"
+author: "Joe LaRocca"
+date: "2024-11-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Problem 1
+
+#### Create the Birthday Simulator Function
+
+```{r}
+
+bday_sim = function(n) {
+  bdays = sample(1:365, size = n, replace = TRUE)
+  duplicate = length(unique(bdays)) < n
+  return(duplicate)
+}
+
+```
+
+#### Run 10,000 Iterations from Sample Size 2 to 50
+
+```{r}
+
+sim_res =
+  expand_grid(
+    n = c(2:50),
+    iter = 1:10000
+  ) %>% 
+  mutate(res = map_lgl(n, bday_sim)) %>%
+  group_by(n) %>%
+  summarize(prob = mean(res))
+
+```
+
+#### Make a Plot of Sample Size vs. Probability
+
+```{r}
+
+sim_res %>%
+  ggplot(aes(x = n, y = prob)) + 
+  geom_point() + 
+  labs(
+    title = "Birthday Problem: Plot of Sample Size vs. Probability of a Duplicate Birthday",
+    x = "Sample Size",
+    y = "Probability of Duplicate"
+  )
+
+```
+
+The plot of sample size vs. probability of a duplicate is S-shaped, and strongly resembles a Logistic curve. The probability of a duplicate first crosses 50\% at $n = 23$.
+
+## Problem 2
+
+```{r}
+
+t_test = function(mu, n = 30, sd = 5){
+  test = t.test(rnorm(n, mu, sd)) |>
+    broom::tidy() |>
+    select(estimate, p.value)
+  return(test)
+}
+
+```
+
+
+```{r}
+
+sim_res = expand_grid(
+  mu = c(0:6),
+  iter = c(1:5000)
+) %>%
+  mutate(res = map(mu, t_test))
+
+
+```
+
+
+```{r}
+
+t.test(rnorm(30, 0, 5)) |>
+  broom::tidy()
+
+```
+
+
+## Problem 3
