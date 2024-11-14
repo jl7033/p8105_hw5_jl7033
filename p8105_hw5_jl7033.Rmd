@@ -120,13 +120,6 @@ sim_res |>
 
 From the plot, we can see that the sample averages for each value of $\mu$ are approximately equal to the true values of $\mu$. In theory, this would be true because we know $E(X) = \mu$ and $\bar{x} = \frac{\sum_{k = 1}^n}{n}$. So, $E(\bar{x}) = E(\frac{\sum_{i = 1}^n x_i}{n}) = \frac{1}{n} E(\sum_{i = 1}^n x_i) = \frac{1}{n}(E(X_1) + E(X_2) + ... + E(X_n)) = \frac{1}{n}({n\mu}) = \mu$. In other words, the expectation of the sample mean is equal to the expectation of each individual data point, which is $\mu$.
 
-```{r}
-
-t.test(rnorm(30, 0, 5)) |>
-  broom::tidy()
-
-```
-
 ## Problem 3
 
 
