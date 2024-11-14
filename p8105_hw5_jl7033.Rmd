@@ -32,9 +32,9 @@ sim_res =
   expand_grid(
     n = c(2:50),
     iter = 1:10000
-  ) %>% 
-  mutate(res = map_lgl(n, bday_sim)) %>%
-  group_by(n) %>%
+  ) |>
+  mutate(res = map_lgl(n, bday_sim)) |>
+  group_by(n) |>
   summarize(prob = mean(res))
 
 ```
@@ -43,7 +43,7 @@ sim_res =
 
 ```{r}
 
-sim_res %>%
+sim_res |>
   ggplot(aes(x = n, y = prob)) + 
   geom_point() + 
   labs(
@@ -58,6 +58,8 @@ The plot of sample size vs. probability of a duplicate is S-shaped, and strongly
 
 ## Problem 2
 
+#### Create a t_test function that cleans the test and selects for the data we want
+
 ```{r}
 
 t_test = function(mu, n = 30, sd = 5){
@@ -69,6 +71,7 @@ t_test = function(mu, n = 30, sd = 5){
 
 ```
 
+#### Run the simulation 5000 times for mu between 0 and 6 inclusive
 
 ```{r}
 
@@ -78,9 +81,44 @@ sim_res = expand_grid(
 ) %>%
   mutate(res = map(mu, t_test))
 
+```
+
+#### Format the data for plotting
+
+```{r}
+
+sim_res = sim_res |>
+  unnest(res) |>
+  mutate(reject = p.value < 0.05)
 
 ```
 
+#### Make Plot #1
+
+```{r}
+
+sim_res |>
+  select(mu, reject) |>
+  group_by(mu) |>
+  summarize(prob_reject = mean(reject)) |>
+  ggplot(aes(x = mu, y = prob_reject)) +
+  geom_point()
+
+```
+
+From this plot, we can see that there is a strong, positive, and nonlinear association between effect size and power. More specifically, we see the sharpest increases in power between $\mu = 1$ and $\mu = 2$ and between $\mu = 2$ and $\mu = 3$. The probability of rejection first crosses 50\% at $\mu = 2$.
+
+#### Make Plot #2
+
+```{r}
+
+sim_res |>
+  ggplot(aes(x = mu, y = estimate, col = reject)) +
+  geom_point(alpha = 0.1)
+
+```
+
+From the plot, we can see that the sample averages for each value of $\mu$ are approximately equal to the true values of $\mu$. In theory, this would be true because we know $E(X) = \mu$ and $\bar{x} = \frac{\sum_{k = 1}^n}{n}$. So, $E(\bar{x}) = E(\frac{\sum_{i = 1}^n x_i}{n}) = \frac{1}{n} E(\sum_{i = 1}^n x_i) = \frac{1}{n}(E(X_1) + E(X_2) + ... + E(X_n)) = \frac{1}{n}({n\mu}) = \mu$. In other words, the expectation of the sample mean is equal to the expectation of each individual data point, which is $\mu$.
 
 ```{r}
 
@@ -88,6 +126,5 @@ t.test(rnorm(30, 0, 5)) |>
   broom::tidy()
 
 ```
-
 
 ## Problem 3
