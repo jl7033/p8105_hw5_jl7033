@@ -102,7 +102,12 @@ sim_res |>
   group_by(mu) |>
   summarize(prob_reject = mean(reject)) |>
   ggplot(aes(x = mu, y = prob_reject)) +
-  geom_point()
+  geom_point() + 
+  labs(
+    x = "Mu value",
+    y = "Probability of Rejecting the Null Hypothesis at Alpha = 0.05",
+    title = "Probability of Rejecting the Null Hypothesis at Alpha = 0.05, n = 30, SD = 5"
+  )
 
 ```
 
@@ -112,13 +117,41 @@ From this plot, we can see that there is a strong, positive, and nonlinear assoc
 
 ```{r}
 
-sim_res |>
-  ggplot(aes(x = mu, y = estimate, col = reject)) +
-  geom_point(alpha = 0.1)
+sim_res_all = sim_res |>
+  group_by(mu) |>
+  summarize(mean = mean(estimate)) |>
+  mutate(type = "all")
+
+sim_res_reject = sim_res |>
+  group_by(mu, reject) |>
+  summarize(mean = mean(estimate)) |>
+  filter(reject == TRUE) |>
+  mutate(type = "reject") |>
+  select(mu, mean, type)
+
+sim_res_total = rbind(sim_res_all, sim_res_reject)
 
 ```
 
-From the plot, we can see that the sample averages for each value of $\mu$ are approximately equal to the true values of $\mu$. In theory, this would be true because we know $E(X) = \mu$ and $\bar{x} = \frac{\sum_{k = 1}^n}{n}$. So, $E(\bar{x}) = E(\frac{\sum_{i = 1}^n x_i}{n}) = \frac{1}{n} E(\sum_{i = 1}^n x_i) = \frac{1}{n}(E(X_1) + E(X_2) + ... + E(X_n)) = \frac{1}{n}({n\mu}) = \mu$. In other words, the expectation of the sample mean is equal to the expectation of each individual data point, which is $\mu$.
+```{r}
+
+sim_res_total |>
+  ggplot(aes(x = mu, y = mean, col = type)) + 
+  geom_point(size = 2, alpha = 0.6) + 
+  labs(
+    x = "Mu value",
+    y = "Mean Mu_hat value",
+    title = "Mean value of Mu_hat for 5,000 Random Samples, n = 30, SD = 5"
+  )
+
+```
+
+In theory, the sample averages for each value of $\mu$ are approximately equal to the true values of $\mu$ regardless of whether the null hypothesis is rejected or not, because we know $E(X) = \mu$ and $\bar{x} = \frac{\sum_{k = 1}^n}{n}$. So, $E(\hat{\mu}) = E(\frac{\sum_{i = 1}^n x_i}{n}) = \frac{1}{n} E(\sum_{i = 1}^n x_i) = \frac{1}{n}(E(X_1) + E(X_2) + ... + E(X_n)) = \frac{1}{n}({n\mu}) = \mu$. In other words, the expectation of the sample mean is equal to the expectation of each individual data point, which is $\mu$. Therefore, the "red" data points (counting all samples, not just the ones in which the null hypothesis was rejected) approximate the line $y = x$.
+
+We can see that when the probability of rejection is much less than 100\%, the mean $\hat{\mu}$ value is higher than the $\mu$ value for the samples in which the null was rejected. First, we can see that the mean $\hat{mu}$ for samples in which the null is rejected when $\mu = 0$ is close to 0, since some samples were rejected because the value of $\hat{mu}$ was significantly **less than** 0. For $\mu$ values of 1 or larger, the probability of $\hat{mu}$ being significantly less than 0 is minuscule, so the mean $\hat{mu}$ among the samples in which the null hypothesis was rejected starts to more closely approximate the mean $\hat{\mu}$ for all samples. When the probability of rejection approaches 100\%, the mean $\hat{\mu}$ value in the samples for which the null is rejected closely approaches the mean $\hat{\mu}$ value for all samples (mostly because the probability of rejection is very high).
+
+
+This is because rejection of the null hypothesis happens only when $\hat{\mu}$ is far enough away from 0. 
 
 ## Problem 3
 
@@ -174,42 +207,81 @@ homicides = homicides |>
       disposition == "Closed without arrest" |
       disposition == "Open/No arrest")
 
-homicides |> 
+homicide_stats = homicides |> 
   group_by(city_state) |>
   summarize(
     num_homicides = length(disposition),
     num_unsolved = sum(unsolved)
   )
 
+homicide_stats
+
 ```
 
-#### Using prop.test for Baltimore
+#### Create a prop_test function that tests proportion of unsolved homicides by city
 
 ```{r}
 
-homicides |>
-  filter(city_state == "Baltimore, MD") |>
-  pull(unsolved) |>
-  prop.test(sum(unsolved), n = length(unsolved), p = 0.5)
+prop_test_interval = function(city, p = 0.5) {
+  x = homicide_stats |>
+    filter(city_state == city) |>
+    pull(num_unsolved)
   
+  n = homicide_stats |> 
+    filter(city_state == city) |>
+    pull(num_homicides)
+  
+  test = prop.test(x, n, p) |>
+    broom::tidy() |>
+    select(estimate, conf.low, conf.high)
+    return(test)
+}
 
 ```
+
+#### Find confidence interval for Baltimore
 
 ```{r}
 
-x = c(TRUE, TRUE, FALSE, TRUE, FALSE, FALSE, TRUE)
-
-prop.test(sum(x), n = 7, p = 0.5)
+homicide_stats |>
+  filter(city_state == "Baltimore, MD") |>
+  mutate(results = map(city_state, prop_test_interval)) |>
+  unnest(results)
 
 ```
+
+#### Find confidence interval for all cities
 
 ```{r}
 
-heads <- rbinom(1, size = 100, prob = .5)
-prop.test(heads, 100)          # continuity correction TRUE by default
-prop.test(heads, 100, correct = FALSE)
+homicide_cis = homicide_stats |>
+  group_by(city_state) |>
+  mutate(results = map(city_state, prop_test_interval)) |>
+  unnest(results) |>
+  filter(city_state != "Tulsa, AL")
 
-heads
+homicide_cis
 
 ```
+
+#### Make Plot of Estimates and CIs
+
+```{r}
+
+homicide_cis |>
+  ggplot(aes(x = fct_reorder(city_state, estimate), y = estimate)) + 
+  geom_boxplot() + 
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  coord_flip() + 
+   labs(
+    x = "Esimated Proportion of Unsolved Homicides",
+    y = "City",
+    title = "Estimations of Proportion of Unsolved Homicides and CIs by U.S. City"
+  )
+
+```
+
+
+
+
 
